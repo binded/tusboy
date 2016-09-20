@@ -30,13 +30,15 @@
 // The Server SHOULD always attempt to store as much of the received
 // data as possible.
 
+import { SizeStream } from 'common-streams'
+
 import * as errors from '../errors'
 
 const w = (getPromise) => (req, res, next) => {
   getPromise(req, res, next).catch(next)
 }
 
-export default (opts) => w(async (req, res, next) => {
+export default (opts) => w(async (req, res) => {
   // The request MUST include a Upload-Offset header
   if (!('uploadOffset' in req.tus)) {
     throw errors.missingHeader('upload-offset')
@@ -73,26 +75,19 @@ export default (opts) => w(async (req, res, next) => {
     }
   }
 
-  /*
-  let size
-  const sizeStream = new SizeStream((s) => {
-    size = s
-  })
-  */
-
-  // const body = req.pipe(sizeStream)
-  // TODO: calc size stream here... dont rely on return value of
-  // .write()
-
-  opts
-    .write(req)
-    .then((newOffset) => {
-      //  It MUST include the Upload-Offset header containing the new offset.
-      res.set('Upload-Offset', newOffset)
-      // The Server MUST acknowledge successful PATCH requests
-      // with the 204 No Content status.
-      res.status(204)
-      res.end()
+  const sizePromise = new Promise((resolve) => {
+    req.pipe(new SizeStream()).on('data', ({ size }) => {
+      resolve(size)
     })
-    .catch(next)
+  })
+
+  await opts.write(req)
+  const bytesRead = await sizePromise
+  const newOffset = uploadOffset + bytesRead
+  //  It MUST include the Upload-Offset header containing the new offset.
+  res.set('Upload-Offset', newOffset)
+  // The Server MUST acknowledge successful PATCH requests
+  // with the 204 No Content status.
+  res.status(204)
+  res.end()
 })
