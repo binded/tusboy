@@ -32,25 +32,57 @@
 
 import * as errors from '../errors'
 
-export default (opts) => (req, res, next) => {
+const w = (getPromise) => (req, res, next) => {
+  getPromise(req, res, next).catch(next)
+}
+
+export default (opts) => w(async (req, res, next) => {
   // The request MUST include a Upload-Offset header
   if (!('uploadOffset' in req.tus)) {
-    return next(errors.missingHeader('upload-offset'))
+    throw errors.missingHeader('upload-offset')
   }
 
   // The request MUST include a Content-Type header
   if (typeof req.get('content-type') === 'undefined') {
-    return next(errors.missingHeader('content-type'))
+    throw errors.missingHeader('content-type')
   }
 
   // All PATCH requests MUST use Content-Type: application/offset+octet-stream
   if (req.get('content-type') !== 'application/offset+octet-stream') {
-    return next(errors.invalidHeader('content-type', req.get('content-type')))
+    throw errors.invalidHeader('content-type', req.get('content-type'))
   }
 
-  // TODO: use opts.info() to detect invalid stuff...
-  // e.g. offset mismatch...
-  // opts.info().then ...
+  const {
+    uploadOffset,
+    // uploadLength,
+    uploadDeferLength,
+  } = await opts.info(req)
+
+  if (uploadOffset !== req.tus.uploadOffset) {
+    throw errors.offsetMismatch(uploadOffset, req.tus.uploadOffset)
+  }
+  if ('uploadLength' in req.tus) {
+    // Upload-Length header set but upload-length is already known
+    if (!uploadDeferLength) throw errors.uploadLengthAlreadySet()
+    if (typeof opts.setUploadLength === 'function') {
+      await opts.setUploadLength(req, req.tus.uploadLength)
+    } else {
+      throw errors.preconditionError(
+        'got upload-length header but creation-defer-length extension is not supported'
+      )
+    }
+  }
+
+  /*
+  let size
+  const sizeStream = new SizeStream((s) => {
+    size = s
+  })
+  */
+
+  // const body = req.pipe(sizeStream)
+  // TODO: calc size stream here... dont rely on return value of
+  // .write()
 
   opts
     .write(req)
@@ -63,4 +95,4 @@ export default (opts) => (req, res, next) => {
       res.end()
     })
     .catch(next)
-}
+})

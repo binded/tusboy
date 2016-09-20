@@ -120,6 +120,23 @@ test('patch (first half)', (t) => {
     })
 })
 
+test('patch (wrong offset)', (t) => {
+  const halfway = Math.floor(file('crow.jpg').size / 2)
+  const rs = file('crow.jpg').rs({ start: halfway })
+  client
+    .patch('/1', rs, {
+      headers: {
+        'Content-Type': 'application/offset+octet-stream',
+        'Upload-Offset': halfway - 10,
+      },
+    })
+    .catch(({ response }) => {
+      t.equal(response.status, 409)
+      t.end()
+    })
+})
+
+
 test('patch (second half)', (t) => {
   const halfway = Math.floor(file('crow.jpg').size / 2)
   const rs = file('crow.jpg').rs({ start: halfway })
