@@ -2,9 +2,12 @@ import test from 'blue-tape'
 import express from 'express'
 import axios from 'axios'
 import { encode } from 'tus-metadata'
+import { createHash } from 'crypto'
 
 import tusboy from '../src'
 import { setupFsStore, file } from './common'
+
+const md5 = (buf) => createHash('md5').update(buf).digest()
 
 let server
 let baseURL
@@ -32,8 +35,9 @@ test('start server', (t) => {
     create: (req) => {
       const key = nextId()
       const uploadLength = req.tus.uploadLength
+      const uploadMetadata = req.tus.uploadMetadata
       return store
-        .create(key, { uploadLength })
+        .create(key, { uploadLength, uploadMetadata })
         .then(() => `/${key}`)
     },
     info: (req) => {
@@ -45,6 +49,16 @@ test('start server', (t) => {
       return store.write(key, req)
     },
   }))
+  app.get('/:key', (req, res, next) => {
+    store
+      .info(req.params.key)
+      .then(({ uploadLength, uploadMetadata }) => {
+        res.set('Content-Type', uploadMetadata.contentType)
+        res.set('Content-Length', uploadLength)
+        store.createReadStream(req.params.key).on('error', next).pipe(res)
+      })
+      .catch(next)
+  })
   server = app.listen(() => {
     baseURL = `http://localhost:${server.address().port}`
     client = axios.create({
@@ -106,7 +120,7 @@ test('head', (t) => (
 
 test('patch (first half)', (t) => {
   const halfway = Math.floor(file('crow.jpg').size / 2)
-  const rs = file('crow.jpg').rs({ start: 0, end: halfway - 1 })
+  const rs = file('crow.jpg').rs({ start: 0, end: halfway })
   return client
     .patch('/1', rs, {
       headers: {
@@ -116,13 +130,13 @@ test('patch (first half)', (t) => {
     })
     .then((response) => {
       const { headers } = response
-      t.equal(headers['upload-offset'], `${halfway}`, 'Upload-Offset')
+      t.equal(headers['upload-offset'], `${halfway + 1}`, 'Upload-Offset')
     })
 })
 
 test('patch (wrong offset)', (t) => {
   const halfway = Math.floor(file('crow.jpg').size / 2)
-  const rs = file('crow.jpg').rs({ start: halfway })
+  const rs = file('crow.jpg').rs()
   client
     .patch('/1', rs, {
       headers: {
@@ -136,15 +150,14 @@ test('patch (wrong offset)', (t) => {
     })
 })
 
-
 test('patch (second half)', (t) => {
   const halfway = Math.floor(file('crow.jpg').size / 2)
-  const rs = file('crow.jpg').rs({ start: halfway })
+  const rs = file('crow.jpg').rs({ start: halfway + 1 })
   return client
     .patch('/1', rs, {
       headers: {
         'Content-Type': 'application/offset+octet-stream',
-        'Upload-Offset': halfway,
+        'Upload-Offset': halfway + 1,
       },
     })
     .then((response) => {
@@ -152,6 +165,18 @@ test('patch (second half)', (t) => {
       t.equal(headers['upload-offset'], `${file('crow.jpg').size}`, 'Upload-Offset')
     })
 })
+
+test('read file', (t) => (
+  client
+    .get('/1', {
+      responseType: 'arraybuffer',
+    })
+    .then((response) => {
+      t.equal(response.headers['content-type'], 'image/jpeg')
+      t.equal(response.headers['content-length'], `${file('crow.jpg').size}`)
+      t.deepEqual(md5(response.data), md5(file('crow.jpg').buf))
+    })
+))
 
 test((t) => {
   server.close(() => t.end())
