@@ -1,4 +1,5 @@
-import streamMeter from './utils/meter-stream'
+import { PassThrough } from 'stream'
+import MeterStream from './utils/meter-stream'
 import * as errors from './errors'
 import {
   encode as encodeMetadata,
@@ -10,7 +11,10 @@ const headerExists = (req, name) => typeof req.get(name) !== 'undefined'
 const ensureTrailingSlash = (str) => (
   str[str.length - 1] === '/' ? str : `${str}/`
 )
-export default (store, { maxSize, onUploadCompleted }) => {
+
+// const tap = fn => (res) => fn(res).then(() => res)
+
+export default (store) => {
   const create = (req, res, next) => {
     const defer = headerExists(req, 'upload-defer-length')
     if (!defer && !headerExists(req, 'upload-length')) {
@@ -29,6 +33,7 @@ export default (store, { maxSize, onUploadCompleted }) => {
       ))
     }
     const uploadLength = defer ? null : parseInt(req.get('upload-length'), 10)
+    const maxSize = store.maxSize
     if (uploadLength !== null && uploadLength > maxSize) {
       res.set('Tus-Max-Size', maxSize)
       return next(errors.entityTooLarge(
@@ -38,11 +43,11 @@ export default (store, { maxSize, onUploadCompleted }) => {
 
     const metadata = decodeMetadata(req.get('upload-metadata'))
 
-    // TODO: async await
-    store.create({ defer, metadata, uploadLength })
+    const opts = { defer, metadata, uploadLength }
+    return store.create(opts, req)
       .then(({ key }) => {
         res.status(201)
-        res.set('Location', `${ensureTrailingSlash(req.path)}${key}`)
+        res.set('Location', `${ensureTrailingSlash(req.path)}${store.encodeKey(key, req)}`)
         res.end()
       })
       .catch(next)
@@ -54,7 +59,7 @@ export default (store, { maxSize, onUploadCompleted }) => {
     // response.
     res.set('Cache-Control', 'no-store')
     store
-      .stats(req.params.key)
+      .stats(store.decodeKey(req.params.encodedKey, req))
       .then((upload) => {
         if (!upload) {
           //  If the resource is not found, the Server SHOULD return
@@ -107,12 +112,12 @@ export default (store, { maxSize, onUploadCompleted }) => {
 
     const offset = parseInt(req.get('upload-offset'), 10)
 
-    const { key } = req.params
+    const key = store.decodeKey(req.params.encodedKey, req)
 
     return store
-      .stats(key)
+      .stats(key, req)
       .then((upload) => {
-        if (!upload) throw errors.unknownResource(req.params.key)
+        if (!upload) throw errors.unknownResource()
         // If the offsets do not match, the Server MUST respond with the
         // 409 Conflict status without modifying the upload resource.
         if (upload.offset !== offset) {
@@ -121,7 +126,11 @@ export default (store, { maxSize, onUploadCompleted }) => {
         if (headerExists(req, 'upload-length')) {
           // Upload-Length header set but upload-length is already known
           if (!upload.defer) throw errors.uploadLengthAlreadySet()
-
+          if (!store.extensions.includes('creation-defer-length')) {
+            throw errors.preconditionError(
+              'got upload-length header but creation-defer-length extension is not supported'
+            )
+          }
           const uploadLength = parseInt(req.get('upload-length'), 10)
           return store
             .setUploadLength(key, uploadLength)
@@ -134,35 +143,26 @@ export default (store, { maxSize, onUploadCompleted }) => {
       })
       .then((upload) => {
         const maxStreamSize = upload.uploadLength - upload.offset
-        const readStream = req.pipe(streamMeter(maxStreamSize))
+        const readStream = req.pipe(new MeterStream(maxStreamSize))
         let destroyed = false
         readStream.on('error', () => {
           // stream size exceeded, abort request
           destroyed = true
           req.destroy()
         })
-        // TODO: ensure that req stops emitting data after
-        // we reached upload length
-        return store.write(key, readStream)
+
+        // we pipe through passthrough so overflow error not visible
+        // from store
+        return store
+          .write(key, readStream.pipe(new PassThrough()))
           .then((newOffset) => {
             if (destroyed) return
-
-            const beforeResponse = () => {
-              // Upload completed!
-              if (newOffset === upload.uploadLength) {
-                return onUploadCompleted({ ...upload, offset: newOffset })
-              }
-            }
-            return Promise.resolve()
-              .then(beforeResponse)
-              .then(() => {
-                //  It MUST include the Upload-Offset header containing the new offset.
-                res.set('Upload-Offset', newOffset)
-                // The Server MUST acknowledge successful PATCH requests
-                // with the 204 No Content status.
-                res.status(204)
-                res.end()
-              })
+            //  It MUST include the Upload-Offset header containing the new offset.
+            res.set('Upload-Offset', newOffset)
+            // The Server MUST acknowledge successful PATCH requests
+            // with the 204 No Content status.
+            res.status(204)
+            res.end()
           })
       })
       .catch(next)

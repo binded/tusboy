@@ -1,5 +1,7 @@
 import { Transform } from 'stream'
 
+class OverflowError extends Error {}
+
 class MeterSream extends Transform {
   constructor(maxSize = Infinity) {
     super()
@@ -10,11 +12,12 @@ class MeterSream extends Transform {
     if (this.maxSize === Infinity) return cb(null, chunk)
     this.byteCount += chunk.length
     if (this.byteCount > this.maxSize) {
-      const err = new Error(`Stream exceeded specified max of ${this.maxSize} bytes.`)
+      const err = new OverflowError(`Stream exceeded specified max of ${this.maxSize} bytes.`)
       return cb(err)
     }
     cb(null, chunk)
   }
 }
+MeterSream.OverflowError = OverflowError
 
-export default (maxSize) => new MeterSream(maxSize)
+export default MeterSream

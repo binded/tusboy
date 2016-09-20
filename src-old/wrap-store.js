@@ -1,10 +1,11 @@
 // Validate / clean up store implementation
 
-// 1. makes sure store implements required methods
-// 2. detects which extensions store supports by checking which methods
-//    are implemented
-// 3. returns a new object made of known methods from the store
-//    and an extensions property
+const isFunction = (fn) => typeof fn === 'function'
+
+// 1. throws if store doesn't implement required methods
+// 2. detects which extensions store supports based on implemented methods
+// 3. creates new object that proxies store and adds .extensions &
+//    .maxSize props
 export default (store) => {
   const schema = {
     required: ['write', 'stats'],
@@ -23,14 +24,27 @@ export default (store) => {
       ['concatenation', ['concat']],
       ['concatenation-unfinished', ['concat', 'concatUnfinished']],
     ],
+    base: {
+      encodeKey: encodedKey => encodedKey,
+      decodeKey: key => key,
+    },
   }
   const missingMethods = schema.required
-    .filter(name => typeof store[name] !== 'function')
+    .filter(name => !isFunction(store[name]))
 
   if (missingMethods.length) {
     throw new Error(
       `store is missing ${missingMethods.join(',')} methods`
     )
+  }
+  if (isFunction(store.checksumAlgorithms)) {
+    // The Server MUST support at least the SHA1 checksum algorithm
+    // identified by sha1.
+    if (!store.checksumAlgorithms().includes('sha1')) {
+      throw new Error(
+        `store is missing ${missingMethods.join(',')} methods`
+      )
+    }
   }
 
   const supportedExtensions = schema.extensions
@@ -49,8 +63,12 @@ export default (store) => {
 
   const extensions = supportedExtensions.map(([extName]) => extName)
 
+  const maxSize = store.maxSize || Infinity
+
   return Object.assign(
-    { extensions },
+    {},
+    schema.base,
+    { extensions, maxSize },
     ...allMethods.map(name => ({ [name]: store[name].bind(store) })),
   )
 }
