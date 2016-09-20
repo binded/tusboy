@@ -65,7 +65,6 @@ export default (opts, extensions = []) => (req, res, next) => {
   const { uploadLength } = tus
   const defer = !!tus.uploadDeferLength
 
-  console.log(defer)
   if (!defer && !('uploadLength' in tus)) {
     return next(errors.preconditionError(
       'Missing Upload-Length header'
@@ -89,7 +88,8 @@ export default (opts, extensions = []) => (req, res, next) => {
     ), { maxSize, uploadLength })
   }
 
-  Promise.resolve().then(() => opts.create(req))
+  Promise.resolve()
+    .then(() => opts.create(req))
     .then((url) => {
       res.status(201)
       res.set('Location', url)

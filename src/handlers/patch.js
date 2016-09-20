@@ -54,5 +54,13 @@ export default (opts) => (req, res, next) => {
 
   opts
     .write(req)
+    .then((newOffset) => {
+      //  It MUST include the Upload-Offset header containing the new offset.
+      res.set('Upload-Offset', newOffset)
+      // The Server MUST acknowledge successful PATCH requests
+      // with the 204 No Content status.
+      res.status(204)
+      res.end()
+    })
     .catch(next)
 }

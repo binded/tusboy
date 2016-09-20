@@ -17,8 +17,8 @@ import { encode as encodeMetadata } from 'tus-metadata'
 
 export default (opts) => (req, res, next) => {
   res.set('Cache-Control', 'no-store')
-  opts
-    .info(req)
+  Promise.resolve()
+    .then(() => opts.info(req))
     .then(({
       uploadOffset,
       uploadLength,

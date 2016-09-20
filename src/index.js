@@ -25,7 +25,7 @@ const detectExtensions = (opts) => {
 const versionSupported = (/* versionStr */) => true
 
 const setTusResumableHeader = (req, res, next) => {
-  res.set('Tus-Resumable', constants.TUS_RESUMABLE)
+  res.set('Tus-Resumable', constants.TUS_VERSION)
   next()
 }
 
