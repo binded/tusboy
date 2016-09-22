@@ -1,6 +1,6 @@
 {
   "name": "tusboy",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Tus protocol middleware for Express (resumable file upload)",
   "main": "./lib/index.js",
   "directories": {
@@ -46,7 +46,7 @@
     "cz-conventional-changelog": "^1.2.0",
     "eslint-config-blockai": "^1.0.1",
     "fs-tus-store": "^1.1.0",
-    "kitchenfile": "^1.0.1",
+    "kitchenfile": "^1.0.2",
     "mkdirp": "^0.5.1",
     "nodemon": "^1.10.2",
     "rimraf": "^2.5.4",
