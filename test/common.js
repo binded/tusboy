@@ -12,3 +12,12 @@ export const setupFsStore = () => {
   mkdirp.sync(directory)
   return fsStore({ directory })
 }
+
+export const counter = () => {
+  let i = 0
+  return () => {
+    const next = i
+    i += 1
+    return `${next}`
+  }
+}

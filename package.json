@@ -51,6 +51,9 @@
     "nodemon": "^1.10.2",
     "rimraf": "^2.5.4",
     "semantic-release": "^4.3.5",
+    "string-to-stream": "^1.1.0",
+    "temp": "^0.8.3",
+    "tus-js-client": "^1.4.1",
     "uuid": "^2.0.3"
   },
   "release": {

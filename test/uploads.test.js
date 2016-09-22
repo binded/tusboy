@@ -6,7 +6,7 @@ import { createHash } from 'crypto'
 import { memstore } from 'abstract-tus-store'
 
 import tusboy from '../src'
-import { file } from './common'
+import { file, counter } from './common'
 
 const md5 = (buf) => createHash('md5').update(buf).digest()
 
@@ -16,15 +16,7 @@ let client
 
 const store = memstore()
 
-const nextId = (() => {
-  let i = 0
-  return () => {
-    const next = i
-    i += 1
-    return `${next}`
-  }
-})()
-
+const nextId = counter()
 
 test('start server', (t) => {
   const app = express()
