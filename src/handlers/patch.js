@@ -29,8 +29,8 @@
 //
 // The Server SHOULD always attempt to store as much of the received
 // data as possible.
-import * as errors from '../errors'
 import { errors as storeErrors } from 'abstract-tus-store'
+import * as errors from '../errors'
 
 export default (store, {
   onComplete = () => {},
