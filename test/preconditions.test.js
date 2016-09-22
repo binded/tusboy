@@ -1,6 +1,7 @@
 import test from 'blue-tape'
 import express from 'express'
 import axios from 'axios'
+import { memstore } from 'abstract-tus-store'
 
 import tusboy from '../src'
 
@@ -10,13 +11,13 @@ let client
 
 // TODO: test options
 
+const store = memstore()
+
 test('start server', (t) => {
   const app = express()
-  app.use(tusboy({
-    create: () => {},
-    info: () => {},
-    write: () => {},
-    maxSize: 100000,
+  app.use(tusboy(store, {
+    getKey: () => 'somekey',
+    maxUploadLength: 100000,
   }))
   server = app.listen(() => {
     baseURL = `http://localhost:${server.address().port}`

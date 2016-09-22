@@ -29,16 +29,11 @@
 //
 // The Server SHOULD always attempt to store as much of the received
 // data as possible.
-
-import { SizeStream } from 'common-streams'
-
 import * as errors from '../errors'
 
-const w = (getPromise) => (req, res, next) => {
-  getPromise(req, res, next).catch(next)
-}
-
-export default (opts) => w(async (req, res) => {
+export default (store, {
+  onComplete = () => {},
+}) => (async (req, res) => {
   // The request MUST include a Upload-Offset header
   if (!('uploadOffset' in req.tus)) {
     throw errors.missingHeader('upload-offset')
@@ -54,38 +49,19 @@ export default (opts) => w(async (req, res) => {
     throw errors.invalidHeader('content-type', req.get('content-type'))
   }
 
+  const uploadId = req.params.uploadId
+
   const {
-    uploadOffset,
-    // uploadLength,
-    uploadDeferLength,
-  } = await opts.info(req)
-
-  if (uploadOffset !== req.tus.uploadOffset) {
-    throw errors.offsetMismatch(uploadOffset, req.tus.uploadOffset)
-  }
-  if ('uploadLength' in req.tus) {
-    // Upload-Length header set but upload-length is already known
-    if (!uploadDeferLength) throw errors.uploadLengthAlreadySet()
-    if (typeof opts.setUploadLength === 'function') {
-      await opts.setUploadLength(req, req.tus.uploadLength)
-    } else {
-      throw errors.preconditionError(
-        'got upload-length header but creation-defer-length extension is not supported'
-      )
-    }
-  }
-
-  const sizePromise = new Promise((resolve) => {
-    req.pipe(new SizeStream()).on('data', ({ size }) => {
-      resolve(size)
-    })
+    offset,
+    upload,
+  } = await store.append(uploadId, req, req.tus.uploadOffset, {
+    uploadLength: req.tus.uploadLength,
   })
-
-  await opts.write(req)
-  const bytesRead = await sizePromise
-  const newOffset = uploadOffset + bytesRead
+  if (upload && upload.uploadLength === offset) {
+    await onComplete(upload)
+  }
   //  It MUST include the Upload-Offset header containing the new offset.
-  res.set('Upload-Offset', newOffset)
+  res.set('Upload-Offset', offset)
   // The Server MUST acknowledge successful PATCH requests
   // with the 204 No Content status.
   res.status(204)

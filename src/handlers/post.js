@@ -57,11 +57,14 @@
 //
 // The Client MUST perform the actual upload using the core protocol.
 
+import url from 'url'
 import * as errors from '../errors'
 
-export default (opts, extensions = []) => (req, res, next) => {
+export default (store, {
+  getKey = () => {},
+  maxUploadLength = Infinity,
+}) => async (req, res, next) => {
   const tus = req.tus
-  const { maxSize = Infinity } = opts
   const { uploadLength } = tus
   const defer = !!tus.uploadDeferLength
 
@@ -70,7 +73,8 @@ export default (opts, extensions = []) => (req, res, next) => {
       'Missing Upload-Length header'
     ))
   }
-  if (defer && !extensions.includes('creation-defer-length')) {
+  // TODO: make sure store supports defer length
+  if (defer && !store.supportsDeferredLength) {
     return next(errors.preconditionError(
       'Store does not support creation-defer-length extension'
     ))
@@ -81,19 +85,18 @@ export default (opts, extensions = []) => (req, res, next) => {
     ))
   }
 
-  if ('uploadLength' in tus && uploadLength > maxSize) {
-    res.set('Tus-Max-Size', maxSize)
+  if ('uploadLength' in tus && uploadLength > maxUploadLength) {
+    res.set('Tus-Max-Size', maxUploadLength)
     return next(errors.entityTooLarge(
-      `Upload-length (${uploadLength}) exceeds max upload size (${maxSize})`
-    ), { maxSize, uploadLength })
+      `Upload-length (${uploadLength}) exceeds max upload size (${maxUploadLength})`
+    ), { maxUploadLength, uploadLength })
   }
 
-  Promise.resolve()
-    .then(() => opts.create(req))
-    .then((url) => {
-      res.status(201)
-      res.set('Location', url)
-      res.end()
-    })
-    .catch(next)
+  const key = await getKey(req)
+  const uploadId = await store.create(key, { uploadLength })
+  res.status(201)
+  let basePath = url.parse(req.url)
+  if (basePath[basePath.length - 1] !== '/') basePath += '/'
+  res.set('Location', `${basePath}${uploadId}`)
+  res.end()
 }

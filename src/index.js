@@ -5,6 +5,7 @@ import cors from 'cors'
 
 import * as constants from './constants'
 import * as errors from './errors'
+import w from './wrap-async-handler'
 
 import errorHandler from './handlers/error'
 import options from './handlers/options'
@@ -13,10 +14,10 @@ import patch from './handlers/patch'
 import post from './handlers/post'
 
 // TODO
-const detectExtensions = (opts) => {
+const detectExtensions = (store) => {
   const extensions = [
-    () => { if (opts.create) return 'create' },
-    () => { if (opts.del) return 'delete' },
+    'create',
+    () => { if (store.del) return 'delete' },
   ].filter(ele => typeof ele === 'string')
   return extensions
 }
@@ -48,24 +49,20 @@ const setCorsHeaders = cors({
   exposedHeaders: constants.EXPOSED_HEADERS,
 })
 
-export default (opts = {}, {
-  handleErrors = true,
-} = {}) => {
-  const extensions = detectExtensions(opts)
+export default (store, opts = {}) => {
+  const { handleErrors = true } = opts
+  const extensions = detectExtensions(store)
   const router = new Router()
   router
     .use(methodOverride('X-HTTP-Method-Override'))
     .use(tusHeaderParser())
-    .options('*', options(extensions))
+    .options('*', w(options(extensions)))
     .use(setCorsHeaders)
     .use(setTusResumableHeader)
     .use(assertTusResumableHeader)
-    .head('*', head(opts))
-    .patch('*', patch(opts))
-
-  if (typeof opts.create === 'function') {
-    router.post('*', post(opts))
-  }
+    .post('/', w(post(store, opts)))
+    .head('/:uploadId', w(head(store, opts)))
+    .patch('/:uploadId', w(patch(store, opts)))
 
   if (handleErrors) router.use(errorHandler)
 

@@ -15,40 +15,32 @@
 
 import { encode as encodeMetadata } from 'tus-metadata'
 
-export default (opts) => (req, res, next) => {
-  res.set('Cache-Control', 'no-store')
-  Promise.resolve()
-    .then(() => opts.info(req))
-    .then(({
-      uploadOffset,
-      uploadLength,
-      uploadMetadata,
-      uploadDeferLength,
-    }) => {
-      // TODO: validate that info() didn't return garbage
+export default (store) => (
+  async (req, res) => {
+    res.set('Cache-Control', 'no-store')
+    const { uploadId } = req.params
+    const upload = await store.info(uploadId)
+    // The Server MUST always include the Upload-Offset header in the
+    // response for a HEAD request, even if the offset is 0, or the upload
+    // is already considered completed.
+    res.set('Upload-Offset', upload.offset)
 
-      // The Server MUST always include the Upload-Offset header in the
-      // response for a HEAD request, even if the offset is 0, or the upload
-      // is already considered completed.
-      res.set('Upload-Offset', uploadOffset)
-
-      if (uploadDeferLength) {
-        //  As long as the length of the upload is not known, the Server
-        //  MUST set Upload-Defer-Length: 1 in all responses to HEAD requests.
-        res.set('Upload-Defer-Length', '1')
-      } else {
-        // If the size of the upload is known, the Server MUST include
-        // the Upload-Length header in the response
-        res.set('Upload-Length', uploadLength)
-      }
-      // If an upload contains additional metadata, responses to HEAD
-      // requests MUST include the Upload-Metadata header and its value as
-      // specified by the Client during the creation.
-      const encodedMetadata = encodeMetadata(uploadMetadata)
-      if (encodedMetadata !== '') {
-        res.set('Upload-Metadata', encodedMetadata)
-      }
-      res.end()
-    })
-    .catch(next)
-}
+    if (!('uploadLength' in upload)) {
+      //  As long as the length of the upload is not known, the Server
+      //  MUST set Upload-Defer-Length: 1 in all responses to HEAD requests.
+      res.set('Upload-Defer-Length', '1')
+    } else {
+      // If the size of the upload is known, the Server MUST include
+      // the Upload-Length header in the response
+      res.set('Upload-Length', upload.uploadLength)
+    }
+    // If an upload contains additional metadata, responses to HEAD
+    // requests MUST include the Upload-Metadata header and its value as
+    // specified by the Client during the creation.
+    const encodedMetadata = encodeMetadata(upload.metadata)
+    if (encodedMetadata !== '') {
+      res.set('Upload-Metadata', encodedMetadata)
+    }
+    res.end()
+  }
+)
