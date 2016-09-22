@@ -3,21 +3,18 @@ import express from 'express'
 import axios from 'axios'
 import { encode } from 'tus-metadata'
 import { createHash } from 'crypto'
+import { memstore } from 'abstract-tus-store'
 
 import tusboy from '../src'
-import { setupFsStore, file } from './common'
+import { file } from './common'
 
 const md5 = (buf) => createHash('md5').update(buf).digest()
 
 let server
 let baseURL
 let client
-let store
 
-test('setup', (t) => {
-  store = setupFsStore()
-  t.end()
-})
+const store = memstore()
 
 const nextId = (() => {
   let i = 0
@@ -31,33 +28,17 @@ const nextId = (() => {
 
 test('start server', (t) => {
   const app = express()
-  app.use(tusboy({
-    create: (req) => {
-      const key = nextId()
-      const uploadLength = req.tus.uploadLength
-      const uploadMetadata = req.tus.uploadMetadata
-      return store
-        .create(key, { uploadLength, uploadMetadata })
-        .then(() => `/${key}`)
-    },
-    info: (req) => {
-      const key = req.params[0].substr(1)
-      return store.info(key)
-    },
-    write: (req) => {
-      const key = req.params[0].substr(1)
-      return store.write(key, req)
-    },
+  app.use('/uploads', tusboy(store, {
+    getKey: () => `${nextId()}`,
   }))
-  app.get('/:key', (req, res, next) => {
-    store
-      .info(req.params.key)
-      .then(({ uploadLength, uploadMetadata }) => {
-        res.set('Content-Type', uploadMetadata.contentType)
-        res.set('Content-Length', uploadLength)
-        store.createReadStream(req.params.key).on('error', next).pipe(res)
+  app.get('/files/:key', (req, res, next) => {
+    const rs = store
+      .createReadStream(req.params.key, ({ contentLength, metadata }) => {
+        res.set('Content-Type', metadata.contentType)
+        res.set('Content-Length', contentLength)
+        rs.pipe(res)
       })
-      .catch(next)
+      .on('error', next)
   })
   server = app.listen(() => {
     baseURL = `http://localhost:${server.address().port}`
@@ -71,9 +52,10 @@ test('start server', (t) => {
   })
 })
 
+let uploadUrl0
 test('create', (t) => (
   client
-    .post('/', null, {
+    .post('/uploads', null, {
       headers: {
         'Upload-Length': file('crow.jpg').size,
         'Upload-Metadata': encode({
@@ -82,13 +64,15 @@ test('create', (t) => (
       },
     })
     .then((response) => {
-      t.equal(response.headers.location, '/0', 'Location header')
+      t.equal(typeof response.headers.location, 'string', 'Location header')
+      uploadUrl0 = response.headers.location
     })
 ))
 
+let uploadUrl1
 test('create', (t) => (
   client
-    .post('/', null, {
+    .post('/uploads', null, {
       headers: {
         'Upload-Length': file('crow.jpg').size,
         'Upload-Metadata': encode({
@@ -97,13 +81,15 @@ test('create', (t) => (
       },
     })
     .then((response) => {
-      t.equal(response.headers.location, '/1', 'Location header')
+      uploadUrl1 = response.headers.location
+      t.equal(typeof uploadUrl1, 'string', 'Location header')
+      t.notEqual(uploadUrl0, uploadUrl1)
     })
 ))
 
 test('head', (t) => (
   client
-    .head('/1')
+    .head(uploadUrl1)
     .then((response) => {
       const { headers } = response
       t.equal(headers['cache-control'], 'no-store', 'cache-control')
@@ -122,7 +108,7 @@ test('patch (first half)', (t) => {
   const halfway = Math.floor(file('crow.jpg').size / 2)
   const rs = file('crow.jpg').rs({ start: 0, end: halfway })
   return client
-    .patch('/1', rs, {
+    .patch(uploadUrl1, rs, {
       headers: {
         'Content-Type': 'application/offset+octet-stream',
         'Upload-Offset': 0,
@@ -138,7 +124,7 @@ test('patch (wrong offset)', (t) => {
   const halfway = Math.floor(file('crow.jpg').size / 2)
   const rs = file('crow.jpg').rs()
   client
-    .patch('/1', rs, {
+    .patch(uploadUrl1, rs, {
       headers: {
         'Content-Type': 'application/offset+octet-stream',
         'Upload-Offset': halfway - 10,
@@ -154,7 +140,7 @@ test('patch (second half)', (t) => {
   const halfway = Math.floor(file('crow.jpg').size / 2)
   const rs = file('crow.jpg').rs({ start: halfway + 1 })
   return client
-    .patch('/1', rs, {
+    .patch(uploadUrl1, rs, {
       headers: {
         'Content-Type': 'application/offset+octet-stream',
         'Upload-Offset': halfway + 1,
@@ -168,7 +154,7 @@ test('patch (second half)', (t) => {
 
 test('read file', (t) => (
   client
-    .get('/1', {
+    .get('/files/1', {
       responseType: 'arraybuffer',
     })
     .then((response) => {

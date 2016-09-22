@@ -57,7 +57,6 @@
 //
 // The Client MUST perform the actual upload using the core protocol.
 
-import url from 'url'
 import * as errors from '../errors'
 
 export default (store, {
@@ -93,9 +92,10 @@ export default (store, {
   }
 
   const key = await getKey(req)
-  const uploadId = await store.create(key, { uploadLength })
+  const metadata = req.tus.uploadMetadata
+  const { uploadId } = await store.create(key, { uploadLength, metadata })
   res.status(201)
-  let basePath = url.parse(req.url)
+  let basePath = req.baseUrl
   if (basePath[basePath.length - 1] !== '/') basePath += '/'
   res.set('Location', `${basePath}${uploadId}`)
   res.end()

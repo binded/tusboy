@@ -30,6 +30,7 @@
 // The Server SHOULD always attempt to store as much of the received
 // data as possible.
 import * as errors from '../errors'
+import { errors as storeErrors } from 'abstract-tus-store'
 
 export default (store, {
   onComplete = () => {},
@@ -51,19 +52,26 @@ export default (store, {
 
   const uploadId = req.params.uploadId
 
-  const {
-    offset,
-    upload,
-  } = await store.append(uploadId, req, req.tus.uploadOffset, {
-    uploadLength: req.tus.uploadLength,
-  })
-  if (upload && upload.uploadLength === offset) {
-    await onComplete(upload)
+  try {
+    const {
+      offset,
+      upload,
+    } = await store.append(uploadId, req, req.tus.uploadOffset, {
+      uploadLength: req.tus.uploadLength,
+    })
+    if (upload && upload.uploadLength === offset) {
+      await onComplete(upload)
+    }
+    //  It MUST include the Upload-Offset header containing the new offset.
+    res.set('Upload-Offset', offset)
+    // The Server MUST acknowledge successful PATCH requests
+    // with the 204 No Content status.
+    res.status(204)
+    res.end()
+  } catch (err) {
+    if (err instanceof storeErrors.OffsetMismatch) {
+      throw errors.offsetMismatch()
+    }
+    throw err
   }
-  //  It MUST include the Upload-Offset header containing the new offset.
-  res.set('Upload-Offset', offset)
-  // The Server MUST acknowledge successful PATCH requests
-  // with the 204 No Content status.
-  res.status(204)
-  res.end()
 })
