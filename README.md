@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/blockai/tusboy.svg?branch=master)](https://travis-ci.org/blockai/tusboy)
 
+WORK IN PROGRESS!
+
 Express middleware for [tus resumable upload protocol](http://tus.io/).
 Uses [abstract-tus-store](https://github.com/blockai/abstract-tus-store).
 Name inspired by [busboy](https://github.com/mscdex/busboy).
@@ -43,11 +45,9 @@ app
   .use('/:username/avatar', new express.Router({ mergeParams: true })
     .get('/', (req, res, next) => {
       const key = = `/users/${req.params.username}/avatar-resized`
-      const rs = store.createReadStream(req.key, (metadata) => {
-        // TODO: contentlength...
-        // rs.set('Content-Length', metadata.contentLength)
+      const rs = store.createReadStream(key, ({ contentLength, metadata }) => {
         rs.set('Content-Type', metadata.contentType)
-        // rs.set('Content-Length', upload.contentLength)
+        rs.set('Content-Length', contentLength)
         rs.pipe(res)
       }).on('error', next)
     })
@@ -67,10 +67,7 @@ app
           // .pipe(resizeImage) actually resize image...
         const resizedKey = `/users/${req.params.username}/avatar-resized`
         const uploadId = await store.create(resizedKey, {
-          metadata: {
-            ...upload.metadata,
-            contentLength: upload.contentLength,
-          },
+          metadata: upload.metadata,
           uploadLength: upload.uploadLength,
         })
         return store.append(resizedUploadId, rs)
