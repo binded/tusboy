@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 import express from 'express'
 import wrapStore from 'keyed-tus-store'
+import test from 'blue-tape'
 
 import setupMemStore from '../stores/memstore'
 import setupFsStore from '../stores/fs-store'
@@ -10,7 +11,7 @@ import tusboy from '../../src'
 import { counter } from '../common'
 import integration from './'
 
-const setup = async (store) => {
+const setupServer = async (store) => {
   const nextId = counter()
   const app = express()
   app.use((req, res, next) => {
@@ -44,15 +45,26 @@ const setup = async (store) => {
   })
 }
 
-const testStore = async (getStore) => {
-  const origStore = await getStore()
-  const store = wrapStore(origStore, 'some secret!')
-  const { endpoint, server } = await setup(store)
-  await integration({ endpoint })
-  server.close()
+const testStore = (getStore) => {
+  let server
+  const setup = async () => {
+    const origStore = await getStore()
+    const store = wrapStore(origStore, 'some secret!')
+    const result = await setupServer(store)
+    const endpoint = result.endpoint
+    server = result.server
+    return endpoint
+  }
+
+  integration({ setup })
+
+  test('teardown', (t) => {
+    server.close()
+    t.end()
+  })
 }
 
-const start = async () => {
+const start = () => {
   try {
     testStore(setupMemStore)
     testStore(setupFsStore)

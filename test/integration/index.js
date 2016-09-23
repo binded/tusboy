@@ -10,10 +10,16 @@ import { createHash } from 'crypto'
 const hash = (buf) => createHash('md5').update(buf).digest('hex')
 
 export default async ({
-  endpoint,
+  setup,
 } = {}) => {
+  let endpoint
+
+  test('setup', async () => {
+    const e = await setup()
+    endpoint = e
+  })
+
   const baseOptions = {
-    endpoint,
     headers: {},
     metadata: {},
     onProgress: () => {},
@@ -24,6 +30,7 @@ export default async ({
   test('file upload - no interruption', (t) => {
     const options = {
       ...baseOptions,
+      endpoint,
       headers: {
         Custom: 'blargh',
       },
@@ -72,6 +79,7 @@ export default async ({
 
       const upload = new tus.Upload(buf, {
         ...baseOptions,
+        endpoint,
         uploadSize,
         chunkSize: minChunkSize,
         onError: t.error,

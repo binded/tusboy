@@ -27,6 +27,10 @@ const client = new aws.S3({
 // hmmmm, tmp workaround for https://github.com/aws/aws-sdk-js/issues/965#issuecomment-247930423
 client.shouldDisableBodySigning = () => true
 
+const wait = (ms) => new Promise((resolve) => {
+  setTimeout(resolve, ms)
+})
+
 const Bucket = bucket
 
 const clearBucket = async () => {
@@ -37,14 +41,20 @@ const clearBucket = async () => {
   return Promise.all(tasks)
 }
 
-const createBucket = async () => {
+const createBucket = async (attempts = 0) => {
   try {
     await clearBucket()
     await client.deleteBucket({ Bucket }).promise()
   } catch (err) {
     // ignore NoSuchBucket errors
     if (err.code !== 'NoSuchBucket') {
-      throw err
+      if (attempts === 3) {
+        throw err
+      }
+      // hmmmm maybe we're doing this too quickly
+      // exp backoff
+      await wait(500 * (2 ** attempts))
+      return createBucket(attempts + 1)
     }
   }
   await client.createBucket({ Bucket }).promise()

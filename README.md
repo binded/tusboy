@@ -2,8 +2,6 @@
 
 [![Build Status](https://travis-ci.org/blockai/tusboy.svg?branch=master)](https://travis-ci.org/blockai/tusboy)
 
-WORK IN PROGRESS!
-
 Express middleware for [tus resumable upload protocol](http://tus.io/).
 Uses [abstract-tus-store](https://github.com/blockai/abstract-tus-store).
 Name inspired by [busboy](https://github.com/mscdex/busboy).
