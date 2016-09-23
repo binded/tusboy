@@ -2,6 +2,7 @@ import tus from 'tus-js-client'
 import test from 'blue-tape'
 import str from 'string-to-stream'
 /* eslint-disable no-console */
+import axios from 'axios'
 
 export default async ({
   endpoint,
@@ -14,6 +15,7 @@ export default async ({
     fingerprint: () => {},
   }
 
+  let uploadUrl
   test('file upload', (t) => {
     const options = {
       ...baseOptions,
@@ -37,10 +39,17 @@ export default async ({
       },
       onSuccess: () => {
         t.comment(`Upload URL: ${upload.url}`)
+        uploadUrl = upload.url
         t.end()
       },
     })
     upload.start()
+  })
+
+  test('download uploaded file', async (t) => {
+    const response = await axios.get(uploadUrl)
+    const data = response.data
+    t.equal(data, 'hello world')
   })
 
   return new Promise((resolve) => {

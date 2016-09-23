@@ -46,6 +46,7 @@
     "cz-conventional-changelog": "^1.2.0",
     "eslint-config-blockai": "^1.0.1",
     "fs-tus-store": "^1.1.0",
+    "keyed-tus-store": "^1.0.0",
     "kitchenfile": "^1.0.2",
     "mkdirp": "^0.5.1",
     "nodemon": "^1.10.2",
