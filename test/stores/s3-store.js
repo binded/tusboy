@@ -35,12 +35,18 @@ const wait = (ms) => new Promise((resolve) => {
 const Bucket = bucket
 
 const clearBucket = async () => {
+  console.log('      => clear bucket')
   const { Contents } = await client.listObjects({ Bucket })
     .promise()
-  const tasks = Contents.map(({ Key }) => (
-    client.deleteObject({ Key, Bucket }).promise()
-  ))
-  return Promise.all(tasks)
+  console.log('      => Contents')
+  console.log(Contents)
+  const tasks = Contents.map(({ Key }) => {
+    console.log('      => deletObject')
+    console.log(`      => ${Key} ${Bucket}`)
+    return client.deleteObject({ Key, Bucket }).promise()
+  })
+  console.log('      => Promise.all(tasks)')
+  return await Promise.all(tasks)
 }
 
 const createBucket = async (attempts = 0) => {
@@ -60,6 +66,7 @@ const createBucket = async (attempts = 0) => {
       }
       // hmmmm maybe we're doing this too quickly
       // exp backoff
+      console.log(`      => wait ${500 * (2 ** attempts)}`)
       await wait(500 * (2 ** attempts))
       return createBucket(attempts + 1)
     }
