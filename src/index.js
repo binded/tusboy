@@ -52,7 +52,7 @@ const setCorsHeaders = cors({
 export default (store, opts = {}) => {
   const { handleErrors = true } = opts
   const extensions = detectExtensions(store)
-  const router = new Router()
+  const router = new Router({ mergeParams: true })
   router
     .use(methodOverride('X-HTTP-Method-Override'))
     .use(tusHeaderParser())

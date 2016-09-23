@@ -2,18 +2,18 @@
 import express from 'express'
 import wrapStore from 'keyed-tus-store'
 
-import getMemStore from './stores/memstore'
-import getFsStore from './stores/fs-store'
+import getMemStore from '../stores/memstore'
+import getFsStore from '../stores/fs-store'
 
-import tusboy from '../src'
-import integration from './integration'
-import { counter } from './common'
+import tusboy from '../../src'
+import { counter } from '../common'
+import integration from './'
 
 const setup = async (store) => {
   const nextId = counter()
   const app = express()
   app.use((req, res, next) => {
-    console.log(`${req.method} - ${req.url}`)
+    // console.log(`${req.method} - ${req.url}`)
     next()
   })
   app.get('/uploads/:uploadId', (req, res, next) => {
@@ -28,6 +28,12 @@ const setup = async (store) => {
   })
   app.use('/uploads', tusboy(store, {
     getKey: () => `somekey-${nextId()}`,
+    /*
+    onComplete: (req, upload, uploadId) => {
+      const key = store.decodeKey(uploadId)
+      console.log(`upload completed, data at ${key}`)
+    },
+    */
   }))
   return new Promise((resolve) => {
     const server = app.listen(() => {

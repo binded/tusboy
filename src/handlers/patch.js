@@ -60,7 +60,7 @@ export default (store, {
       uploadLength: req.tus.uploadLength,
     })
     if (upload && upload.uploadLength === offset) {
-      await onComplete(upload)
+      await onComplete(req, upload, uploadId)
     }
     //  It MUST include the Upload-Offset header containing the new offset.
     res.set('Upload-Offset', offset)

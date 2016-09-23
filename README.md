@@ -58,12 +58,13 @@ app
         const key = `/users/${req.params.username}/avatar`
         return key
       },
-      onComplete: async (req, upload) => {
-        console.log(`Completed upload to ${upload.key}`)
+      onComplete: async (req, upload, uploadId) => {
+        const key = `/users/${req.params.username}/avatar-resized`
+        console.log(`Completed upload ${uploadId}`)
         // If you return a promise, the last patch request will
         // block until promise is resolved.
         // e.g you could resize avatar and write it to .../avatar-resized
-        const rs = store.createReadStream(upload.key)
+        const rs = store.createReadStream(key)
           // .pipe(resizeImage) actually resize image...
         const resizedKey = `/users/${req.params.username}/avatar-resized`
         const uploadId = await store.create(resizedKey, {
