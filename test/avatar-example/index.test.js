@@ -6,7 +6,7 @@ import axios from 'axios'
 import { createHash } from 'crypto'
 
 import getMemStore from '../stores/memstore'
-// import getFsStore from '../stores/fs-store'
+import getFsStore from '../stores/fs-store'
 
 import tusboy from '../../src'
 import { file } from '../common'
@@ -116,7 +116,7 @@ const testStore = (getStore) => {
 (async () => {
   try {
     testStore(getMemStore)
-    // testStore(getFsStore)
+    testStore(getFsStore)
   } catch (err) {
     console.error(err)
     process.exit(1)
