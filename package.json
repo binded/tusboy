@@ -1,6 +1,6 @@
 {
   "name": "tusboy",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Tus protocol middleware for Express (resumable file upload)",
   "main": "./lib/index.js",
   "directories": {
@@ -37,6 +37,7 @@
     "node": ">=6"
   },
   "devDependencies": {
+    "abstract-tus-store": "^1.4.2",
     "aws-sdk": "^2.6.4",
     "axios": "^0.14.0",
     "babel-cli": "^6.14.0",
@@ -46,13 +47,13 @@
     "concat-stream": "^1.5.2",
     "cz-conventional-changelog": "^1.2.0",
     "eslint-config-blockai": "^1.0.1",
-    "fs-tus-store": "^1.2.0",
+    "fs-tus-store": "^1.2.1",
     "keyed-tus-store": "^1.0.0",
     "kitchenfile": "^1.0.2",
     "mkdirp": "^0.5.1",
     "nodemon": "^1.10.2",
     "rimraf": "^2.5.4",
-    "s3-tus-store": "^1.0.1",
+    "s3-tus-store": "^1.0.2",
     "semantic-release": "^4.3.5",
     "string-to-stream": "^1.1.0",
     "temp": "^0.8.3",
