@@ -1,3 +1,4 @@
+/* eslint-disable no-console*/
 import aws from 'aws-sdk'
 // import test from 'blue-tape'
 import initS3Store from 's3-tus-store'
@@ -34,7 +35,8 @@ const wait = (ms) => new Promise((resolve) => {
 const Bucket = bucket
 
 const clearBucket = async () => {
-  const { Contents } = await client.listObjects({ Bucket }).promise()
+  const { Contents } = await client.listObjects({ Bucket })
+    .promise()
   const tasks = Contents.map(({ Key }) => (
     client.deleteObject({ Key, Bucket }).promise()
   ))
@@ -42,11 +44,16 @@ const clearBucket = async () => {
 }
 
 const createBucket = async (attempts = 0) => {
+  console.log(`      => create bucket attempt ${attempts}`)
   try {
+    console.log('      => clear bucket')
     await clearBucket()
+    console.log('      => delete bucket')
     await client.deleteBucket({ Bucket }).promise()
   } catch (err) {
     // ignore NoSuchBucket errors
+    console.log('      => error')
+    console.log(err)
     if (err.code !== 'NoSuchBucket') {
       if (attempts === 3) {
         throw err
@@ -57,10 +64,12 @@ const createBucket = async (attempts = 0) => {
       return createBucket(attempts + 1)
     }
   }
+  console.log('      => client.createbucket')
   await client.createBucket({ Bucket }).promise()
 }
 
 const setup = async () => {
+  console.log('      => setup')
   await createBucket()
   return initS3Store({ client, bucket })
 }
