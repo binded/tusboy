@@ -1,17 +1,21 @@
-// Full integration tests using the tus-js-client client
+/* eslint-disable no-console */
 import express from 'express'
-import { memstore } from 'abstract-tus-store'
 import wrapStore from 'keyed-tus-store'
+
+import getMemStore from './stores/memstore'
+import getFsStore from './stores/fs-store'
 
 import tusboy from '../src'
 import integration from './integration'
 import { counter } from './common'
 
-const nextId = counter()
-
-const setup = async () => {
-  const store = wrapStore(memstore(), 'some secret!')
+const setup = async (store) => {
+  const nextId = counter()
   const app = express()
+  app.use((req, res, next) => {
+    console.log(`${req.method} - ${req.url}`)
+    next()
+  })
   app.get('/uploads/:uploadId', (req, res, next) => {
     const key = store.decodeKey(req.params.uploadId)
     const rs = store
@@ -33,14 +37,23 @@ const setup = async () => {
   })
 }
 
-const letsgo = async () => {
-  const { endpoint, server } = await setup()
+const testStore = async (getStore) => {
+  const origStore = await getStore()
+  const store = wrapStore(origStore, 'some secret!')
+  const { endpoint, server } = await setup(store)
   await integration({ endpoint })
   server.close()
 }
 
-letsgo().catch((err) => {
-  /* eslint-disable no-console */
-  console.error(err)
-  process.exit(1)
-})
+const start = async () => {
+  try {
+    testStore(getMemStore)
+    testStore(getFsStore)
+  } catch (err) {
+    console.error(err)
+    process.exit(1)
+  }
+}
+
+start()
+

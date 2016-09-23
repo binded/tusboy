@@ -1,8 +1,13 @@
-import tus from 'tus-js-client'
+// Full integration tests using the tus-js-client client
+import tus from 'tus-js-client-olalonde'
 import test from 'blue-tape'
 import str from 'string-to-stream'
-/* eslint-disable no-console */
 import axios from 'axios'
+import { RandomStream } from 'common-streams'
+import concat from 'concat-stream'
+import { createHash } from 'crypto'
+
+const hash = (buf) => createHash('md5').update(buf).digest('hex')
 
 export default async ({
   endpoint,
@@ -16,7 +21,7 @@ export default async ({
   }
 
   let uploadUrl
-  test('file upload', (t) => {
+  test('file upload - no interruption', (t) => {
     const options = {
       ...baseOptions,
       headers: {
@@ -50,6 +55,40 @@ export default async ({
     const response = await axios.get(uploadUrl)
     const data = response.data
     t.equal(data, 'hello world')
+  })
+
+  test('file upload - with interruptions', (t) => {
+    (async () => {
+      const mb = 1024 * 1024
+      // we need this to be at least 5mb to test with s3 backed store :/
+      const minChunkSize = 5 * mb
+      const uploadSize = 15 * mb
+
+      const buf = await new Promise((resolve) => {
+        new RandomStream(uploadSize).pipe(concat((b) => {
+          resolve(b)
+        }))
+      })
+
+      const upload = new tus.Upload(buf, {
+        ...baseOptions,
+        uploadSize,
+        chunkSize: minChunkSize,
+        onError: t.error,
+        onChunkComplete: (chunkSize, bytesAccepted, bytesTotal) => {
+          t.comment(`${chunkSize} chunk size, ${bytesAccepted} bytes accepted of ${bytesTotal}`)
+        },
+        onSuccess: async () => {
+          t.comment(`Upload URL: ${upload.url}`)
+          const { data } = await axios.get(upload.url, {
+            responseType: 'arraybuffer',
+          })
+          t.deepEqual(hash(data), hash(buf))
+          t.end()
+        },
+      })
+      upload.start()
+    })()
   })
 
   return new Promise((resolve) => {
