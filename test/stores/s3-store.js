@@ -35,48 +35,34 @@ const wait = (ms) => new Promise((resolve) => {
 const Bucket = bucket
 
 const clearBucket = async () => {
-  console.log('      => clear bucket')
   const { Contents } = await client.listObjects({ Bucket })
     .promise()
-  console.log('      => Contents')
-  console.log(Contents)
-  const tasks = Contents.map(({ Key }) => {
-    console.log('      => deletObject')
-    console.log(`      => ${Key} ${Bucket}`)
-    return client.deleteObject({ Key, Bucket }).promise()
-  })
-  console.log('      => Promise.all(tasks)')
+  const tasks = Contents.map(({ Key }) => (
+    client.deleteObject({ Key, Bucket }).promise()
+  ))
   return await Promise.all(tasks)
 }
 
 const createBucket = async (attempts = 0) => {
-  console.log(`      => create bucket attempt ${attempts}`)
   try {
-    console.log('      => clear bucket')
     await clearBucket()
-    console.log('      => delete bucket')
     await client.deleteBucket({ Bucket }).promise()
   } catch (err) {
     // ignore NoSuchBucket errors
-    console.log('      => error')
-    console.log(err)
     if (err.code !== 'NoSuchBucket') {
       if (attempts === 3) {
         throw err
       }
       // hmmmm maybe we're doing this too quickly
       // exp backoff
-      console.log(`      => wait ${500 * (2 ** attempts)}`)
       await wait(500 * (2 ** attempts))
       return createBucket(attempts + 1)
     }
   }
-  console.log('      => client.createbucket')
   await client.createBucket({ Bucket }).promise()
 }
 
 const setup = async () => {
-  console.log('      => setup')
   await createBucket()
   return initS3Store({ client, bucket })
 }
