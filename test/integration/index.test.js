@@ -2,8 +2,9 @@
 import express from 'express'
 import wrapStore from 'keyed-tus-store'
 
-import getMemStore from '../stores/memstore'
-import getFsStore from '../stores/fs-store'
+import setupMemStore from '../stores/memstore'
+import setupFsStore from '../stores/fs-store'
+import setupS3Store from '../stores/s3-store'
 
 import tusboy from '../../src'
 import { counter } from '../common'
@@ -53,8 +54,11 @@ const testStore = async (getStore) => {
 
 const start = async () => {
   try {
-    testStore(getMemStore)
-    testStore(getFsStore)
+    testStore(setupMemStore)
+    testStore(setupFsStore)
+    if (process.env.TEST_S3) {
+      testStore(setupS3Store)
+    }
   } catch (err) {
     console.error(err)
     process.exit(1)

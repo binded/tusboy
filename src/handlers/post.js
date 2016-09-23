@@ -93,7 +93,10 @@ export default (store, {
 
   const key = await getKey(req)
   const metadata = req.tus.uploadMetadata
-  const { uploadId } = await store.create(key, { uploadLength, metadata })
+  const { uploadId } = await store.create(key, {
+    uploadLength,
+    metadata,
+  })
   res.status(201)
   let basePath = req.baseUrl
   if (basePath[basePath.length - 1] !== '/') basePath += '/'

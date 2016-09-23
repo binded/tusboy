@@ -5,28 +5,32 @@ import tus from 'tus-js-client-olalonde'
 import axios from 'axios'
 import { createHash } from 'crypto'
 
-import getMemStore from '../stores/memstore'
-import getFsStore from '../stores/fs-store'
+import setupMemStore from '../stores/memstore'
+import setupFsStore from '../stores/fs-store'
+import setupS3Store from '../stores/s3-store'
 
 import tusboy from '../../src'
 import { file } from '../common'
 
 const hash = (buf) => createHash('md5').update(buf).digest('hex')
 
+/*
 const logger = (req, res, next) => {
   console.log(`${req.method} - ${req.url}`)
   next()
 }
+*/
 
 const setup = async (store) => {
   const app = express()
   app
     // .use(authenticate)
-    .use(logger)
+    // .use(logger)
     .use('/:username/avatar', new express.Router({ mergeParams: true })
       .get('/', (req, res, next) => {
-        const key = `/users/${req.params.username}/avatar-resized`
+        const key = `users/${req.params.username}/avatar-resized`
         const rs = store.createReadStream(key, ({ contentLength, metadata }) => {
+          // TODO: aws s3 makes metadata keys lowercase...
           res.set('Content-Type', metadata.contentType)
           res.set('Content-Length', contentLength)
           rs.pipe(res)
@@ -36,18 +40,20 @@ const setup = async (store) => {
         getKey: (req) => {
           // always return same key... last successful completed upload
           // wins.
-          const key = `/users/${req.params.username}/avatar`
+          const key = `users/${req.params.username}/avatar`
           return key
         },
         onComplete: async (req, upload, completedUploadId) => {
-          const key = `/users/${req.params.username}/avatar`
+          // TODO: leading slash doesn't work with minio
+          // e.g. /users/.../...
+          const key = `users/${req.params.username}/avatar`
           console.log(`Completed upload ${completedUploadId}`)
           // If you return a promise, the last patch request will
           // block until promise is resolved.
           // e.g you could resize avatar and write it to .../avatar-resized
           const rs = store.createReadStream(key)
             // .pipe(resizeImage) actually resize image...
-          const resizedKey = `/users/${req.params.username}/avatar-resized`
+          const resizedKey = `users/${req.params.username}/avatar-resized`
           const { uploadId } = await store.create(resizedKey, {
             metadata: upload.metadata,
             uploadLength: upload.uploadLength,
@@ -85,8 +91,8 @@ const testStore = (getStore) => {
       metadata: {
         contentType: 'image/jpeg',
       },
-      // uploadSize: 'hello world'.length,
-      onError: t.error,
+      onError: () => {},
+      // onError: t.error,
       onProgress: (bytesUploaded, bytesTotal) => {
         const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2)
         t.comment(`Uploaded ${bytesUploaded} of ${bytesTotal} bytes ${percentage}%`)
@@ -115,8 +121,11 @@ const testStore = (getStore) => {
 
 (async () => {
   try {
-    testStore(getMemStore)
-    testStore(getFsStore)
+    testStore(setupMemStore)
+    testStore(setupFsStore)
+    if (process.env.TEST_S3) {
+      testStore(setupS3Store)
+    }
   } catch (err) {
     console.error(err)
     process.exit(1)

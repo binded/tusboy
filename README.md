@@ -44,10 +44,10 @@ app
   // .use(authenticate)
   .use('/:username/avatar', new express.Router({ mergeParams: true })
     .get('/', (req, res, next) => {
-      const key = = `/users/${req.params.username}/avatar-resized`
+      const key = `users/${req.params.username}/avatar-resized`
       const rs = store.createReadStream(key, ({ contentLength, metadata }) => {
-        rs.set('Content-Type', metadata.contentType)
-        rs.set('Content-Length', contentLength)
+        res.set('Content-Type', metadata.contentType)
+        res.set('Content-Length', contentLength)
         rs.pipe(res)
       }).on('error', next)
     })
@@ -55,23 +55,23 @@ app
       getKey: (req) => {
         // always return same key... last successful completed upload
         // wins.
-        const key = `/users/${req.params.username}/avatar`
+        const key = `users/${req.params.username}/avatar`
         return key
       },
-      onComplete: async (req, upload, uploadId) => {
-        const key = `/users/${req.params.username}/avatar-resized`
-        console.log(`Completed upload ${uploadId}`)
+      onComplete: async (req, upload, completedUploadId) => {
+        const key = `users/${req.params.username}/avatar`
+        console.log(`Completed upload ${completedUploadId}`)
         // If you return a promise, the last patch request will
         // block until promise is resolved.
         // e.g you could resize avatar and write it to .../avatar-resized
         const rs = store.createReadStream(key)
           // .pipe(resizeImage) actually resize image...
-        const resizedKey = `/users/${req.params.username}/avatar-resized`
-        const uploadId = await store.create(resizedKey, {
+        const resizedKey = `users/${req.params.username}/avatar-resized`
+        const { uploadId } = await store.create(resizedKey, {
           metadata: upload.metadata,
           uploadLength: upload.uploadLength,
         })
-        return store.append(resizedUploadId, rs)
+        await store.append(uploadId, rs)
       },
     }))
   )
