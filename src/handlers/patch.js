@@ -33,8 +33,12 @@ import { errors as storeErrors } from 'abstract-tus-store'
 import * as errors from '../errors'
 
 export default (store, {
-  onComplete = () => {},
+  onComplete,
+  beforeComplete = async () => {},
+  afterComplete = async () => {},
 }) => (async (req, res) => {
+  const after = onComplete || afterComplete
+
   // The request MUST include a Upload-Offset header
   if (!('uploadOffset' in req.tus)) {
     throw errors.missingHeader('upload-offset')
@@ -57,10 +61,11 @@ export default (store, {
       offset,
       upload,
     } = await store.append(uploadId, req, req.tus.uploadOffset, {
+      beforeComplete,
       uploadLength: req.tus.uploadLength,
     })
     if (upload && upload.uploadLength === offset) {
-      await onComplete(req, upload, uploadId)
+      await after(req, upload, uploadId)
     }
     //  It MUST include the Upload-Offset header containing the new offset.
     res.set('Upload-Offset', offset)

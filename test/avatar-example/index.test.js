@@ -4,6 +4,7 @@ import test from 'blue-tape'
 import tus from 'tus-js-client-olalonde'
 import axios from 'axios'
 import { createHash } from 'crypto'
+import concat from 'concat-stream'
 
 import setupMemStore from '../stores/memstore'
 import setupFsStore from '../stores/fs-store'
@@ -14,18 +15,16 @@ import { file } from '../common'
 
 const hash = (buf) => createHash('md5').update(buf).digest('hex')
 
-/*
 const logger = (req, res, next) => {
   console.log(`${req.method} - ${req.url}`)
   next()
 }
-*/
 
-const setup = async (store) => {
+const setup = async (store, beforeComplete = () => {}) => {
   const app = express()
   app
     // .use(authenticate)
-    // .use(logger)
+    .use(logger)
     .use('/:username/avatar', new express.Router({ mergeParams: true })
       .get('/', (req, res, next) => {
         const key = `users/${req.params.username}/avatar-resized`
@@ -43,11 +42,12 @@ const setup = async (store) => {
           const key = `users/${req.params.username}/avatar`
           return key
         },
-        onComplete: async (req, upload, completedUploadId) => {
+        beforeComplete,
+        afterComplete: async (req, upload) => {
           // TODO: leading slash doesn't work with minio
           // e.g. /users/.../...
           const key = `users/${req.params.username}/avatar`
-          console.log(`Completed upload ${completedUploadId}`)
+          // console.log(`Completed upload ${completedUploadId}`)
           // If you return a promise, the last patch request will
           // block until promise is resolved.
           // e.g you could resize avatar and write it to .../avatar-resized
@@ -70,9 +70,10 @@ const setup = async (store) => {
   })
 }
 
-const testStore = (getStore) => {
+const testStore = (getStore, type) => {
   let store
-  test('setup store', async () => {
+  test('setup store', async (t) => {
+    t.comment(`setting up ${type} tus store`)
     store = await getStore()
   })
 
@@ -117,18 +118,56 @@ const testStore = (getStore) => {
     server.close()
     t.end()
   })
+
+  test('setup app with beforeComplete', async () => {
+    const result = await setup(store, () => {
+      throw new Error('stop!')
+    })
+    baseURL = result.endpoint
+    server = result.server
+  })
+
+  test('upload avatar (fail)', (t) => {
+    const endpoint = `${baseURL}/olalonde/avatar/upload/`
+    const upload = new tus.Upload(file('poem.txt').buf, {
+      endpoint,
+      metadata: {
+        contentType: 'text/plain',
+      },
+      onError: (err) => {
+        t.equal(err.originalRequest.status, 500)
+        t.end()
+      },
+      onSuccess: () => {
+        t.fail('we should not succeed...')
+      },
+    })
+    upload.start()
+  })
+
+  test('make sure key was not overwritten', (t) => {
+    const rs = store.createReadStream(
+      'users/olalonde/avatar',
+      ({ contentLength, metadata }) => {
+        // TODO: aws s3 makes metadata keys lowercase...
+        rs.pipe(concat((buf) => {
+          t.equal(contentLength, file('crow.jpg').size)
+          t.equal(metadata.contentType, 'image/jpeg')
+          t.deepEqual(buf, file('crow.jpg').buf)
+          t.end()
+        }))
+      }
+    ).on('error', t.fail)
+  })
+
+  test('close server', (t) => {
+    server.close()
+    t.end()
+  })
 }
 
-(async () => {
-  try {
-    testStore(setupMemStore)
-    testStore(setupFsStore)
-    if (process.env.TEST_S3) {
-      testStore(setupS3Store)
-    }
-  } catch (err) {
-    console.error(err)
-    process.exit(1)
-  }
-})()
-
+testStore(setupMemStore, 'mem')
+testStore(setupFsStore, 'fs')
+if (process.env.TEST_S3) {
+  testStore(setupS3Store, 's3')
+}

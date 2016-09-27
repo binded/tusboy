@@ -56,7 +56,8 @@ app
         const key = `users/${req.params.username}/avatar`
         return key
       },
-      onComplete: async (req, upload, completedUploadId) => {
+      beforeComplete: async (req, upload, uploadId) => {},
+      afterComplete: async (req, upload, completedUploadId) => {
         const key = `users/${req.params.username}/avatar`
         console.log(`Completed upload ${completedUploadId}`)
         // If you return a promise, the last patch request will
