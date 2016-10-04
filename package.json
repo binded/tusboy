@@ -1,6 +1,6 @@
 {
   "name": "tusboy",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "Tus protocol middleware for Express (resumable file upload)",
   "main": "./lib/index.js",
   "directories": {
