@@ -11,13 +11,13 @@ const tusExtension = (extensions = []) => {
   }
 }
 
-const corsPreflight = cors({
-  methods: ALLOWED_METHODS,
+const corsPreflight = (extraMethods) => cors({
+  methods: [...ALLOWED_METHODS, ...extraMethods],
   allowedHeaders: ALLOWED_HEADERS,
   maxAge: MAX_AGE,
 })
 
-export default (extensions) => ([
+export default (extensions, extraMethods = []) => ([
   tusExtension(extensions),
-  corsPreflight,
+  corsPreflight(extraMethods),
 ])

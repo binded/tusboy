@@ -56,7 +56,7 @@ export default (store, opts = {}) => {
   router
     .use(methodOverride('X-HTTP-Method-Override'))
     .use(tusHeaderParser())
-    .options('*', options(extensions))
+    .options('*', options(extensions, opts.extraCorsMethods))
     .use(setCorsHeaders)
     .use(setTusResumableHeader)
     .use(assertTusResumableHeader)
