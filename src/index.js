@@ -2,10 +2,10 @@ import { Router } from 'express'
 import tusHeaderParser from 'tus-header-parser'
 import methodOverride from 'method-override'
 import cors from 'cors'
+import w from 'express-async-wrap'
 
 import * as constants from './constants'
 import * as errors from './errors'
-import w from './wrap-async-handler'
 
 import errorHandler from './handlers/error'
 import options from './handlers/options'
@@ -56,7 +56,7 @@ export default (store, opts = {}) => {
   router
     .use(methodOverride('X-HTTP-Method-Override'))
     .use(tusHeaderParser())
-    .options('*', w(options(extensions)))
+    .options('*', options(extensions))
     .use(setCorsHeaders)
     .use(setTusResumableHeader)
     .use(assertTusResumableHeader)

@@ -83,6 +83,14 @@ test('patch (missing offset)', (t) => {
     })
 })
 
+test('options', async (t) => {
+  const response = await client({
+    method: 'OPTIONS',
+    url: '/',
+  })
+  t.equal(response.headers['access-control-allow-origin'], '*')
+})
+
 test('close server', (t) => {
   server.close(() => t.end())
 })

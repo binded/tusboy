@@ -61,7 +61,7 @@ export default (store, {
       offset,
       upload,
     } = await store.append(uploadId, req, req.tus.uploadOffset, {
-      beforeComplete,
+      beforeComplete: (...args) => beforeComplete(req, ...args),
       uploadLength: req.tus.uploadLength,
     })
     if (upload && upload.uploadLength === offset) {
