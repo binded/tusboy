@@ -52,6 +52,15 @@ const setCorsHeaders = cors({
 export default (store, opts = {}) => {
   const { handleErrors = true } = opts
   const extensions = detectExtensions(store)
+
+  const nextRouter = new Router({ mergeParams: true })
+    .use(assertTusResumableHeader)
+    .post('/', w(post(store, opts)))
+    .head('/:uploadId', w(head(store, opts)))
+    .patch('/:uploadId', w(patch(store, opts)))
+
+  if (handleErrors) nextRouter.use(errorHandler)
+
   const router = new Router({ mergeParams: true })
   router
     .use(methodOverride('X-HTTP-Method-Override'))
@@ -59,12 +68,10 @@ export default (store, opts = {}) => {
     .options('*', options(extensions, opts.extraCorsMethods))
     .use(setCorsHeaders)
     .use(setTusResumableHeader)
-    .use(assertTusResumableHeader)
-    .post('/', w(post(store, opts)))
-    .head('/:uploadId', w(head(store, opts)))
-    .patch('/:uploadId', w(patch(store, opts)))
-
-  if (handleErrors) router.use(errorHandler)
+    .use((req, res, next) => {
+      if (req.method === 'GET') return next()
+      return nextRouter(req, res, next)
+    })
 
   return router
 }

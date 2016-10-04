@@ -33,7 +33,7 @@ test('start server', (t) => {
 
 test('missing Tus-Resumable error', (t) => {
   axios
-    .get(baseURL)
+    .head(baseURL)
     .catch((err) => {
       t.equal(err.response.headers['tus-version'], '1.0.0')
       t.equal(err.response.status, 412)
