@@ -51,8 +51,8 @@ app
     })
     .use('/upload', tusboy(store, {
       getKey: (req) => {
-        // always return same key... last successful completed upload
-        // wins.
+        // Always return same key... last successful completed upload
+        // wins. Can throw here if authz error.
         const key = `users/${req.params.username}/avatar`
         return key
       },
