@@ -2,6 +2,7 @@ minio:
   image: minio/minio
   ports:
     - "9000:9000"
+  command: server /export
   volumes:
     - ./test/.minio/data:/export
     - ./test/.minio/config:/root/.minio
