@@ -39,4 +39,4 @@ test/.minio
 
 # Build directory
 lib/
-
+.npmrc
