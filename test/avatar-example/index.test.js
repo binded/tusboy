@@ -5,6 +5,7 @@ import tus from 'tus-js-client-olalonde'
 import axios from 'axios'
 import { createHash } from 'crypto'
 import concat from 'concat-stream'
+import eosCb from 'end-of-stream'
 
 import setupMemStore from '../stores/memstore'
 import setupFsStore from '../stores/fs-store'
@@ -12,6 +13,13 @@ import setupS3Store from '../stores/s3-store'
 
 import tusboy from '../../src'
 import { file } from '../common'
+
+const eos = (stream, opts = {}) => new Promise((resolve, reject) => {
+  eosCb(stream, opts, err => {
+    if (err) return reject(err)
+    resolve()
+  })
+})
 
 const hash = (buf) => createHash('md5').update(buf).digest('hex')
 
@@ -27,6 +35,7 @@ const setup = async (store, beforeComplete = () => {}) => {
     .use(logger)
     .use('/:username/avatar', new express.Router({ mergeParams: true })
       .get('/', (req, res, next) => {
+        // console.log('get')
         const key = `users/${req.params.username}/avatar-resized`
         const rs = store.createReadStream(key, ({ contentLength, metadata }) => {
           // TODO: aws s3 makes metadata keys lowercase...
@@ -44,6 +53,7 @@ const setup = async (store, beforeComplete = () => {}) => {
         },
         beforeComplete,
         afterComplete: async (req, upload) => {
+          // console.log('afterComplete')
           // TODO: leading slash doesn't work with minio
           // e.g. /users/.../...
           const key = `users/${req.params.username}/avatar`
@@ -52,13 +62,17 @@ const setup = async (store, beforeComplete = () => {}) => {
           // block until promise is resolved.
           // e.g you could resize avatar and write it to .../avatar-resized
           const rs = store.createReadStream(key)
+          const rsEos = eos(rs, { writable: false })
             // .pipe(resizeImage) actually resize image...
           const resizedKey = `users/${req.params.username}/avatar-resized`
           const { uploadId } = await store.create(resizedKey, {
             metadata: upload.metadata,
             uploadLength: upload.uploadLength,
           })
-          await store.append(uploadId, rs)
+          await Promise.all([
+            store.append(uploadId, rs),
+            rsEos, // mostly to catch errors
+          ])
         },
       }))
     )
@@ -92,8 +106,7 @@ const testStore = (getStore, type) => {
       metadata: {
         contentType: 'image/jpeg',
       },
-      onError: () => {},
-      // onError: t.error,
+      onError: t.error,
       onProgress: (bytesUploaded, bytesTotal) => {
         const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2)
         t.comment(`Uploaded ${bytesUploaded} of ${bytesTotal} bytes ${percentage}%`)
@@ -102,6 +115,7 @@ const testStore = (getStore, type) => {
         t.comment(`Upload URL: ${upload.url}`)
         t.end()
       },
+      retryDelays: [],
     })
     upload.start()
   })

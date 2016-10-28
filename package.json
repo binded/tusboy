@@ -46,6 +46,7 @@
     "blue-tape": "^1.0.0",
     "concat-stream": "^1.5.2",
     "cz-conventional-changelog": "^1.2.0",
+    "end-of-stream": "^1.1.0",
     "eslint-config-blockai": "^1.0.1",
     "fs-tus-store": "^1.3.0",
     "keyed-tus-store": "^1.0.0",
